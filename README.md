@@ -15,6 +15,7 @@ js/ik.js          inverse kinematics tangan & kaki
 js/render.js      menggambar karakter, kursi, onion skin, hit test
 js/editor.js      interaksi: seret, slider, timeline, tombol
 js/perintah.js    perintah teks -> klip gerakan otomatis
+js/proyek.js      simpan/buka proyek, simpan otomatis, background, ekspor video
 js/app.js         inisialisasi (dimuat paling akhir)
 ```
 

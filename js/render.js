@@ -59,20 +59,25 @@ function drawStool(p){
 }
 function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
 
+function camAt(pose){const c=camOf(pose);return camFollow?{x:pose.x,y:c.y,z:c.z}:c;}
 function render(){
+  const live=playing||exporting;
+  const pose=poseAt(frame),cam=camAt(pose);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle=css('--ground');ctx.fillRect(0,GROUND,W,H-GROUND);
-  drawStool(poseAt(frame));
-  if(onion&&!playing){
+  ctx.fillStyle=css('--panel')||'#fff';ctx.fillRect(0,0,W,H);
+  ctx.save();
+  ctx.translate(W/2,H/2);ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);
+  if(bg.img){const iw=bg.img.width*bg.s,ih=bg.img.height*bg.s;ctx.drawImage(bg.img,bg.x-iw/2,bg.y-ih/2,iw,ih);}
+  else{ctx.fillStyle=css('--ground');ctx.fillRect(-3000,GROUND,7000,800);}
+  drawStool(pose);
+  if(onion&&!live){
     const ks=sortedKeys();
     const prev=ks.filter(k=>k<frame).pop(), next=ks.find(k=>k>frame);
     if(prev!==undefined) drawPose(keys[prev],0.18,'#2b6cd9');
     if(next!==undefined) drawPose(keys[next],0.18,'#2bb36c');
   }
-  const pose=poseAt(frame);
   const w=drawPose(pose,1,null);
-  if(!playing){
+  if(!live&&sel!=='cam'&&sel!=='bg'){
     const acc=css('--accent');
     ctx.save();flipCtx(pose);ctx.strokeStyle=acc;ctx.fillStyle=acc;ctx.lineWidth=2;
     if(sel==='root'){
@@ -91,6 +96,7 @@ function render(){
     }
     ctx.restore();
   }
+  ctx.restore();
   updateUI(pose);
 }
 

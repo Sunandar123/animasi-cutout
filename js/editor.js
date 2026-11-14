@@ -5,10 +5,19 @@ function ensureKey(){
   return keys[frame];
 }
 
-function pt(e){const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height];}
+function ptRaw(e){const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height];}
+// koordinat layar -> koordinat dunia (memperhitungkan kamera)
+function pt(e){const [lx,ly]=ptRaw(e),c=camAt(poseAt(frame));return [(lx-W/2)/c.z+c.x,(ly-H/2)/c.z+c.y];}
 let drag=null;
 cv.addEventListener('pointerdown',e=>{
+  if(exporting) return;
   if(playing) stop();
+  if(sel==='cam'||sel==='bg'){
+    const [rx,ry]=ptRaw(e);cv.setPointerCapture(e.pointerId);
+    if(sel==='cam'){const k=ensureKey();const c=k.cam||(k.cam=clone(CAM0));drag={pan:'cam',rx,ry,ox:c.x,oy:c.y,z:c.z};}
+    else drag={pan:'bg',rx,ry,ox:bg.x,oy:bg.y,z:camAt(poseAt(frame)).z};
+    return;
+  }
   let [px,py]=pt(e);
   if(sel!=='root'){
     const cur=poseAt(frame);px=mirrorX(cur,px);
@@ -18,18 +27,25 @@ cv.addEventListener('pointerdown',e=>{
   }
   const k=ensureKey();
   cv.setPointerCapture(e.pointerId);
-  if(sel==='root') drag={sx:px,sy:py,ox:k.x,oy:k.y};
+  if(sel==='root'){const [rx,ry]=ptRaw(e);drag={sx:rx,sy:ry,ox:k.x,oy:k.y,z:camAt(k).z};}
   else if(ikOn&&IK[sel]){const j=computeWorld(k)[sel];drag={ik:true,ox:j.ex-px,oy:j.ey-py};}
   else{const j=computeWorld(k)[sel];drag={j,start:Math.atan2(py-j.y,px-j.x),deg:k.r[sel]||0};}
   render();
 });
 cv.addEventListener('pointermove',e=>{
   if(!drag) return;
+  if(drag.pan){
+    const [rx,ry]=ptRaw(e),dx=(rx-drag.rx)/drag.z,dy=(ry-drag.ry)/drag.z;
+    if(drag.pan==='cam'){const c=keys[frame].cam;c.x=Math.round(drag.ox-dx);c.y=Math.round(drag.oy-dy);}
+    else{bg.x=Math.round(drag.ox+dx);bg.y=Math.round(drag.oy+dy);}
+    render();return;
+  }
   let [px,py]=pt(e);const k=keys[frame];
   if(sel!=='root') px=mirrorX(k,px);
   if(sel==='root'){
-    k.x=Math.round(Math.max(20,Math.min(W-20,drag.ox+px-drag.sx)));
-    k.y=Math.round(Math.max(90,Math.min(GROUND,drag.oy+py-drag.sy)));
+    const [rx,ry]=ptRaw(e);
+    k.x=Math.round(Math.max(-1000,Math.min(2000,drag.ox+(rx-drag.sx)/drag.z)));
+    k.y=Math.round(Math.max(-200,Math.min(GROUND,drag.oy+(ry-drag.sy)/drag.z)));
   }else if(drag.ik){
     solveIK(k,sel,px+drag.ox,py+drag.oy);
   }else{
@@ -44,7 +60,7 @@ cv.addEventListener('pointermove',e=>{
 
 const chipsEl=document.getElementById('chips');
 function buildChips(){
-  const list=[{id:'root',name:'Geser badan'},...['torso','chest','head','armF_u','armF_l','armB_u','armB_l','legF_u','legF_l','legB_u','legB_l'].map(id=>P[id])];
+  const list=[{id:'cam',name:'🎥 Kamera'},{id:'bg',name:'🖼 Background'},{id:'root',name:'Geser badan'},...['torso','chest','head','armF_u','armF_l','armB_u','armB_l','legF_u','legF_l','legB_u','legB_l'].map(id=>P[id])];
   chipsEl.innerHTML='';
   list.forEach(it=>{
     const b=document.createElement('button');b.className='chip'+(it.id===sel?' on':'');b.textContent=it.name;
@@ -56,15 +72,20 @@ function buildChips(){
 const slEl=document.getElementById('sliders');let sliderDefs=[];
 function buildSliders(){
   slEl.innerHTML='';
+  const camSet=(prop,f)=>(k,v)=>{k.cam=k.cam||clone(CAM0);k.cam[prop]=f?f(v):v;};
   sliderDefs=sel==='root'
-    ?[{label:'Posisi X',min:20,max:W-20,get:p=>p.x,set:(k,v)=>k.x=v},{label:'Posisi Y',min:90,max:GROUND,get:p=>p.y,set:(k,v)=>k.y=v}]
+    ?[{label:'Posisi X',min:-400,max:1200,get:p=>p.x,set:(k,v)=>k.x=v},{label:'Posisi Y',min:-200,max:GROUND,get:p=>p.y,set:(k,v)=>k.y=v}]
+    :sel==='cam'
+    ?[{label:'Zoom',min:50,max:300,get:p=>camOf(p).z*100,set:camSet('z',v=>v/100),unit:'%'},{label:'Kamera X',min:-400,max:1200,get:p=>camOf(p).x,set:camSet('x')},{label:'Kamera Y',min:-200,max:600,get:p=>camOf(p).y,set:camSet('y')}]
+    :sel==='bg'
+    ?[{global:true,label:'Skala',min:5,max:400,get:()=>bg.s*100,set:(k,v)=>bg.s=v/100,unit:'%'},{global:true,label:'Posisi X',min:-600,max:1200,get:()=>bg.x,set:(k,v)=>bg.x=v},{global:true,label:'Posisi Y',min:-400,max:800,get:()=>bg.y,set:(k,v)=>bg.y=v}]
     :[{label:'Rotasi',min:-180,max:180,get:p=>p.r[sel]||0,set:(k,v)=>k.r[sel]=v,unit:'°'}];
   if(sel==='torso'||sel==='chest') sliderDefs.push({label:'Perut (morph)',min:-50,max:100,get:p=>(p.belly||0)*100,set:(k,v)=>k.belly=v/100,unit:'%'});
   sliderDefs.forEach(d=>{
     const row=document.createElement('label');row.className='sl';
     row.innerHTML='<span>'+d.label+'</span><input type="range" min="'+d.min+'" max="'+d.max+'" step="1"><span></span>';
     const inp=row.querySelector('input');d.inp=inp;d.out=row.lastChild;
-    inp.addEventListener('input',()=>{const k=ensureKey();d.set(k,Number(inp.value));render();});
+    inp.addEventListener('input',()=>{const k=d.global?null:ensureKey();d.set(k,Number(inp.value));render();});
     slEl.appendChild(row);
   });
   const tg=sel==='root'?{prop:'bf',txt:v=>'Badan menghadap: '+(v>0?'Kanan ▶':'◀ Kiri')+'  (balik)'}:null;
@@ -73,6 +94,18 @@ function buildSliders(){
     const b=document.createElement('button');b.className='btn';b.style.justifySelf='start';
     b.onclick=()=>{const k=ensureKey();k[tg.prop]=-((k[tg.prop])||1);render();};
     slEl.appendChild(b);toggleDef={b,...tg};
+  }
+  if(sel==='bg'){
+    const row=document.createElement('div');row.className='row';row.style.marginTop='0';
+    const b1=document.createElement('button');b1.className='btn';b1.textContent=bg.img?'Ganti gambar':'Pilih gambar';b1.onclick=()=>document.getElementById('fBg').click();
+    row.appendChild(b1);
+    if(bg.img){const b2=document.createElement('button');b2.className='btn';b2.textContent='Hapus background';b2.onclick=()=>clearBg();row.appendChild(b2);}
+    slEl.appendChild(row);
+  }
+  if(sel==='cam'){
+    const p=document.createElement('p');p.className='sub';p.style.margin='0';
+    p.textContent='Seret kanvas untuk menggeser kamera. Posisi & zoom kamera tersimpan per keyframe.';
+    slEl.appendChild(p);
   }
   headBtns=null;
   if(sel==='head'){
@@ -92,7 +125,7 @@ const track=document.getElementById('track');
 function setFrame(f){frame=Math.max(0,Math.min(FRAMES,f));render();}
 function trackFrame(e){const r=track.getBoundingClientRect();return Math.round((e.clientX-r.left)/r.width*FRAMES);}
 let scrub=false;
-track.addEventListener('pointerdown',e=>{if(playing)stop();scrub=true;track.setPointerCapture(e.pointerId);setFrame(trackFrame(e));});
+track.addEventListener('pointerdown',e=>{if(exporting)return;if(playing)stop();scrub=true;track.setPointerCapture(e.pointerId);setFrame(trackFrame(e));});
 track.addEventListener('pointermove',e=>{if(scrub)setFrame(trackFrame(e));});
 ['pointerup','pointercancel'].forEach(ev=>track.addEventListener(ev,()=>scrub=false));
 const pct=f=>(2+f/FRAMES*96)+'%';
@@ -123,7 +156,7 @@ function tick(ts){
   while(acc>=step){acc-=step;frame=(frame+1)%FRAMES;}
   render();requestAnimationFrame(tick);
 }
-function play(){playing=true;lastTs=0;acc=0;requestAnimationFrame(tick);render();}
+function play(){if(exporting)return;playing=true;lastTs=0;acc=0;requestAnimationFrame(tick);render();}
 function stop(){playing=false;render();}
 
 document.getElementById('bPlay').onclick=()=>playing?stop():play();

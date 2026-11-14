@@ -28,10 +28,13 @@ const passB={x:180,y:209,belly:0.35,r:{chest:4,torso:5,head:-3,armF_u:0,armF_l:-
 const WALK={0:contactA,12:passA,24:contactB,36:passB,48:contactA};
 
 const clone=o=>JSON.parse(JSON.stringify(o));
+const CAM0={x:W/2,y:H/2,z:1};
+const camOf=p=>p.cam||CAM0;
+let bg={src:null,img:null,x:W/2,y:H/2,s:1}, camFollow=false, exporting=false;
 let keys={0:clone(DEFAULT)}, frame=0, playing=false, sel='armF_l', onion=true, ease=true, ikOn=true, showMesh=false;
 
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
-const dpr=Math.min(window.devicePixelRatio||1,3);
+let dpr=Math.min(window.devicePixelRatio||1,3);
 cv.width=W*dpr;cv.height=H*dpr;
 
 function rot(x,y,a){const c=Math.cos(a),s=Math.sin(a);return [x*c-y*s,x*s+y*c];}
@@ -51,7 +54,7 @@ function poseAt(f){
   if(ease) t=t*t*(3-2*t);
   const A=keys[a],B=keys[b],r={};
   for(const p of PARTS) r[p.id]=lerp(A.r[p.id]||0,B.r[p.id]||0,t);
-  return {x:lerp(A.x,B.x,t),y:lerp(A.y,B.y,t),r,belly:lerp(A.belly||0,B.belly||0,t),seat:lerp(A.seat||0,B.seat||0,t),sx:(A.seat?A.sx:B.sx),hv:headView(A),bf:A.bf||1};
+  return {x:lerp(A.x,B.x,t),y:lerp(A.y,B.y,t),r,belly:lerp(A.belly||0,B.belly||0,t),seat:lerp(A.seat||0,B.seat||0,t),sx:(A.seat?A.sx:B.sx),cam:{x:lerp(camOf(A).x,camOf(B).x,t),y:lerp(camOf(A).y,camOf(B).y,t),z:lerp(camOf(A).z,camOf(B).z,t)},hv:headView(A),bf:A.bf||1};
 }
 
 function computeWorld(pose){
