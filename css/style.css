@@ -33,3 +33,11 @@ canvas{display:block;width:100%;height:auto;touch-action:none}
 .chip.cmdc{background:var(--accent-soft);border-color:transparent}
 .help{margin-top:16px;font-size:13px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
 .help ol{margin:4px 0;padding-left:18px}
+.ab{position:absolute;height:5px;border-radius:3px;background:#2bb36c;opacity:.8}
+.trk{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-top:8px;display:grid;gap:6px}
+.trk-h{display:flex;gap:8px;align-items:center}
+.trk-h b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.muted{color:var(--muted);font-size:13px}
+.btn.sm{padding:4px 10px}
+.chk{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.txt{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:16px}

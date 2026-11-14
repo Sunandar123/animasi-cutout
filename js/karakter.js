@@ -54,7 +54,7 @@ function poseAt(f){
   if(ease) t=t*t*(3-2*t);
   const A=keys[a],B=keys[b],r={};
   for(const p of PARTS) r[p.id]=lerp(A.r[p.id]||0,B.r[p.id]||0,t);
-  return {x:lerp(A.x,B.x,t),y:lerp(A.y,B.y,t),r,belly:lerp(A.belly||0,B.belly||0,t),seat:lerp(A.seat||0,B.seat||0,t),sx:(A.seat?A.sx:B.sx),cam:{x:lerp(camOf(A).x,camOf(B).x,t),y:lerp(camOf(A).y,camOf(B).y,t),z:lerp(camOf(A).z,camOf(B).z,t)},hv:headView(A),bf:A.bf||1};
+  return {x:lerp(A.x,B.x,t),y:lerp(A.y,B.y,t),r,belly:lerp(A.belly||0,B.belly||0,t),seat:lerp(A.seat||0,B.seat||0,t),sx:(A.seat?A.sx:B.sx),mouth:A.mouth,cam:{x:lerp(camOf(A).x,camOf(B).x,t),y:lerp(camOf(A).y,camOf(B).y,t),z:lerp(camOf(A).z,camOf(B).z,t)},hv:headView(A),bf:A.bf||1};
 }
 
 function computeWorld(pose){

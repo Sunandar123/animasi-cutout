@@ -11,7 +11,8 @@ function download(blob,name){
 // ---------- simpan / buka file proyek (.json) ----------
 function projectData(withBg){
   return {app:'animasi-cutout',v:1,frames:FRAMES,keys,camFollow,cmd:cmdIn.value,
-          bg:{x:bg.x,y:bg.y,s:bg.s,src:withBg?bg.src:null}};
+          bg:{x:bg.x,y:bg.y,s:bg.s,src:withBg?bg.src:null},
+          audio:audioTracks.map(trackMeta)};
 }
 function applyProject(d){
   if(!d||d.app!=='animasi-cutout'||!d.keys) throw new Error('bukan file proyek animasi');
@@ -23,9 +24,12 @@ function applyProject(d){
   const b=d.bg||{};bg.x=b.x??W/2;bg.y=b.y??H/2;bg.s=b.s??1;
   if(b.src)setBgSrc(b.src,false);else{bg.src=null;bg.img=null;}
   buildChips();buildSliders();render();
+  loadAudioFromProject(d.audio);
 }
-document.getElementById('bSave').onclick=()=>{
-  download(new Blob([JSON.stringify(projectData(true))],{type:'application/json'}),'animasi-'+stamp()+'.json');
+document.getElementById('bSave').onclick=async()=>{
+  const d=projectData(true);
+  d.audio=await Promise.all(audioTracks.map(async t=>Object.assign(trackMeta(t),{data:await blobToDataURL(t.blob)})));
+  download(new Blob([JSON.stringify(d)],{type:'application/json'}),'animasi-'+stamp()+'.json');
   say('Proyek disimpan (cek folder Download).');
 };
 const fOpen=document.getElementById('fOpen');
@@ -101,16 +105,20 @@ const bExport=document.getElementById('bExport');
 bExport.onclick=()=>{if(exporting){if(rec&&rec.state!=='inactive')rec.stop();return;}exportVideo();};
 function exportVideo(){
   if(!cv.captureStream||!window.MediaRecorder){say('Browser ini belum mendukung ekspor video. Coba Chrome terbaru.');return;}
-  const mime=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t=>MediaRecorder.isTypeSupported(t))||'';
+  const withAudio=audioTracks.length>0;
+  const mime=(withAudio
+    ?['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']
+    :['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']).find(t=>MediaRecorder.isTypeSupported(t))||'';
   if(playing)stop();
   const oldDpr=dpr;dpr=3;cv.width=W*dpr;cv.height=H*dpr;      // render resolusi tinggi saat ekspor
   exporting=true;frame=0;render();
   bExport.textContent='⏹ Batal';
-  const chunks=[],stream=cv.captureStream(FPS);
+  const chunks=[],vstream=cv.captureStream(FPS),adest=withAudio?audioDest():null;
+  const stream=adest?new MediaStream([...vstream.getVideoTracks(),...adest.stream.getAudioTracks()]):vstream;   // gambar + suara
   rec=new MediaRecorder(stream,Object.assign({videoBitsPerSecond:8e6},mime?{mimeType:mime}:{}));
   rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
   rec.onstop=()=>{
-    stream.getTracks().forEach(t=>t.stop());
+    audioStop();vstream.getTracks().forEach(t=>t.stop());
     const done=frame>=FRAMES;
     exporting=false;dpr=oldDpr;cv.width=W*dpr;cv.height=H*dpr;bExport.textContent='🎬 Ekspor video';render();
     if(!done){say('Ekspor dibatalkan.');return;}
@@ -119,6 +127,7 @@ function exportVideo(){
     say('Video tersimpan: '+ext.toUpperCase()+', '+(FRAMES/FPS).toFixed(1).replace('.',',')+' dtk.'+(ext==='webm'?' WebM bisa diputar di Chrome/VLC, atau diubah ke MP4 lewat CapCut.':''));
   };
   rec.start(250);
+  if(adest)audioStart(0,{dest:adest});
   const t0=performance.now();
   (function loop(now){
     if(!exporting)return;

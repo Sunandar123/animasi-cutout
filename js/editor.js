@@ -107,7 +107,7 @@ function buildSliders(){
     p.textContent='Seret kanvas untuk menggeser kamera. Posisi & zoom kamera tersimpan per keyframe.';
     slEl.appendChild(p);
   }
-  headBtns=null;
+  headBtns=null;mouthBtns=null;
   if(sel==='head'){
     const row=document.createElement('div');row.className='row';row.style.marginTop='0';
     headBtns=[['L','◀ Kiri'],['F','● Depan'],['B','○ Belakang'],['R','Kanan ▶']].map(([v,t])=>{
@@ -116,9 +116,16 @@ function buildSliders(){
       row.appendChild(b);return b;
     });
     slEl.appendChild(row);
+    const row2=document.createElement('div');row2.className='row';row2.style.marginTop='0';
+    mouthBtns=[['X','Mulut tutup'],['S','Kecil'],['A','A'],['E','E/I'],['O','O/U']].map(([v,t])=>{
+      const b=document.createElement('button');b.className='btn';b.textContent=t;b.dataset.v=v;
+      b.onclick=()=>{const k=ensureKey();k.mouth=v;render();};
+      row2.appendChild(b);return b;
+    });
+    slEl.appendChild(row2);
   }
 }
-let headBtns=null;
+let headBtns=null,mouthBtns=null;
 let toggleDef=null;
 
 const track=document.getElementById('track');
@@ -138,26 +145,34 @@ function updateUI(pose){
   const lab=[12,24,48,96,192,384,768].find(v=>FRAMES/v<=6)||768,minor=lab/4;
   for(let f=0;f<=FRAMES;f+=minor){const big=f%lab===0;h+='<div class="tick'+(big?' big':'')+'" style="left:'+pct(f)+'"></div>';if(big)h+='<div class="tlabel" style="left:'+pct(f)+'">'+String(+(f/FPS).toFixed(1)).replace('.',',')+'s</div>';}
   sortedKeys().forEach(f=>{h+='<div class="kd" style="left:'+pct(f)+'"></div>';});
+  if(typeof audioBarsHTML==='function')h+=audioBarsHTML();
   h+='<div class="ph" style="left:'+pct(frame)+'"></div>';
   track.innerHTML=h;
   sliderDefs.forEach(d=>{const v=Math.round(d.get(pose));if(document.activeElement!==d.inp)d.inp.value=v;d.out.textContent=v+(d.unit||'');});
+  if(mouthBtns){const v=pose.mouth||'X';mouthBtns.forEach(b=>b.classList.toggle('on',b.dataset.v===v));}
   if(headBtns){const v=headView(pose);headBtns.forEach(b=>b.classList.toggle('on',b.dataset.v===v));}
   if(toggleDef) toggleDef.b.textContent=toggleDef.txt(pose[toggleDef.prop]||1);
   document.getElementById('bDel').disabled=!isKey;
   document.getElementById('bPlay').textContent=playing?'⏸ Pause':'▶ Play';
 }
 
-let lastTs=0,acc=0;
-function tick(ts){
+// Pemutaran memakai jam nyata supaya tetap sinkron dengan suara
+let playStart=0,playFrame0=0;
+function tick(){
   if(!playing) return;
-  if(!lastTs) lastTs=ts;
-  acc+=ts-lastTs;lastTs=ts;
-  const step=1000/FPS;
-  while(acc>=step){acc-=step;frame=(frame+1)%FRAMES;}
+  const f=playFrame0+Math.floor((performance.now()-playStart)*FPS/1000);
+  if(f>=FRAMES){frame=0;playFrame0=0;playStart=performance.now();if(typeof audioStart==='function')audioStart(0);}
+  else frame=f;
   render();requestAnimationFrame(tick);
 }
-function play(){if(exporting)return;playing=true;lastTs=0;acc=0;requestAnimationFrame(tick);render();}
-function stop(){playing=false;render();}
+function play(){
+  if(exporting)return;
+  if(frame>=FRAMES)frame=0;
+  playing=true;playFrame0=frame;playStart=performance.now();
+  if(typeof audioStart==='function')audioStart(frame);
+  requestAnimationFrame(tick);render();
+}
+function stop(){playing=false;if(typeof audioStop==='function')audioStop();render();}
 
 document.getElementById('bPlay').onclick=()=>playing?stop():play();
 document.getElementById('bPrev').onclick=()=>{if(playing)stop();setFrame(frame-1);};

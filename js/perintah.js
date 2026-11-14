@@ -61,6 +61,11 @@ function buildFromCommands(text){
       put(6,stand({hv:'F'}));put(3,stand());return true;
     },
     balik(){A.bangun();B.bf*=-1;put(3,stand());return true;},
+    bicara(n){
+      const seq=['A','S','E','O','S','A','X','E'],steps=Math.max(1,Math.round(n*FPS/3));
+      for(let i=0;i<steps;i++)put(3,Object.assign(last(),{mouth:seq[i%seq.length]}));
+      put(3,Object.assign(last(),{mouth:'X'}));return true;
+    },
     diam(n){put(Math.max(1,Math.round(n*FPS)),last());return true;},
   };
   const VERBS=[
@@ -73,6 +78,7 @@ function buildFromCommands(text){
     [/^(lambai|melambai|dadah|dada)/,'lambai','x',3],
     [/^(diam|tunggu|istirahat)/,'diam','dtk',1],
     [/^(balik|berbalik|putar|mundur)/,'balik'],
+    [/^(bicara|berbicara|ngomong|bilang)/,'bicara','dtk',2],
   ];
   text.toLowerCase().split(/,|;|\n|\blalu\b|\bterus\b|\bkemudian\b|\bdan\b/).map(t=>t.trim()).filter(Boolean).forEach(tok=>{
     const v=VERBS.find(([re])=>re.test(tok));
@@ -96,7 +102,7 @@ function runCommands(){
 document.getElementById('cmdGo').onclick=runCommands;
 cmdIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runCommands();}});
 (function(){const el=document.getElementById('cmdChips');
-  ['jalan 3','lari 4','duduk','bangun','tidur','lompat','lambai','balik','diam 1'].forEach(c=>{
+  ['jalan 3','lari 4','duduk','bangun','tidur','lompat','lambai','balik','bicara 2','diam 1'].forEach(c=>{
     const b=document.createElement('button');b.className='chip cmdc';b.textContent='+ '+c;
     b.onclick=()=>{cmdIn.value=(cmdIn.value.trim()?cmdIn.value.trim().replace(/,$/,'')+', ':'')+c;};
     el.appendChild(b);

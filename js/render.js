@@ -14,11 +14,22 @@ function drawPose(pose,alpha,ghost){
         const at=(x,y)=>{const v=rot(x,y,j.a);return [j.x+v[0],j.y+v[1]];};
         const dot=(x,y,r,c)=>{const q=at(x,y);ctx.fillStyle=c;ctx.beginPath();ctx.arc(q[0],q[1],r,0,Math.PI*2);ctx.fill();};
         const seg=(x1,y1,x2,y2,wd,c)=>{const a=at(x1,y1),b=at(x2,y2);ctx.strokeStyle=c;ctx.lineWidth=wd;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();};
-        const HAIR='#3a2a20';
+        const HAIR='#3a2a20',ms=pose.mouth||'X';
+        // bentuk mulut (drawing swap): X tutup, S kecil, A lebar, E/I pipih, O/U bulat
+        const mouth=(lx,ly,sx)=>{
+          const q=at(lx,ly);ctx.save();ctx.translate(q[0],q[1]);ctx.rotate(j.a);
+          const M={S:[5,2.6],A:[7,7],E:[8.5,3],O:[4.6,5.6]}[ms];
+          if(!M){ctx.strokeStyle='#8a4a3a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-3.5*sx,0);ctx.lineTo(3.5*sx,0);ctx.stroke();}
+          else{
+            ctx.fillStyle='#5a1f1a';ctx.beginPath();ctx.ellipse(0,0,M[0]/2*sx,M[1]/2,0,0,Math.PI*2);ctx.fill();
+            if(ms==='A'||ms==='O'){ctx.fillStyle='#d9736a';ctx.beginPath();ctx.ellipse(0,-M[1]*0.22,M[0]*0.28*sx,M[1]*0.18,0,0,Math.PI*2);ctx.fill();}
+          }
+          ctx.restore();
+        };
         if(hv==='F'){
           dot(-22,25,4.5,SKIN);dot(22,25,4.5,SKIN);
           dot(-8,28,2.8,'#2a2a2e');dot(8,28,2.8,'#2a2a2e');
-          seg(-5,14,5,14,2,'#8a4a3a');
+          mouth(0,14,1);
           seg(-15,40,15,40,12,HAIR);
         }else if(hv==='B'){
           dot(-22,25,4.5,SKIN);dot(22,25,4.5,SKIN);
@@ -26,7 +37,7 @@ function drawPose(pose,alpha,ghost){
         }else{
           dot(-21*hf,22,5,SKIN);
           dot(-10*hf,28,2.8,'#2a2a2e');
-          seg(-11*hf,13,-4*hf,13,2,'#8a4a3a');
+          mouth(-8*hf,13,0.65);
           seg(-14*hf,40,16*hf,34,12,HAIR);
           dot(6*hf,24,4.5,SKIN);
         }
@@ -63,6 +74,7 @@ function camAt(pose){const c=camOf(pose);return camFollow?{x:pose.x,y:c.y,z:c.z}
 function render(){
   const live=playing||exporting;
   const pose=poseAt(frame),cam=camAt(pose);
+  const lm=typeof lipAt==='function'&&lipAt(frame);if(lm)pose.mouth=lm;
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.fillStyle=css('--panel')||'#fff';ctx.fillRect(0,0,W,H);
   ctx.save();
