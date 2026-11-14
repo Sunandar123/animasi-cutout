@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipe Animasi 2D Cut-out</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Animasi 2D Cut-out</h1>
+  <p class="sub">Prototipe: pivot · keyframe · interpolasi · IK · mesh deformation</p>
+
+  <div class="cmd">
+    <input id="cmdIn" type="text" autocomplete="off" placeholder="contoh: jalan 3, lambai, duduk, bangun">
+    <button class="btn primary" id="cmdGo">▶ Jalankan</button>
+  </div>
+  <div class="chips" id="cmdChips"></div>
+  <p class="sub" id="cmdMsg" style="margin:2px 0 8px">Ketik perintah, pisahkan dengan koma atau "lalu".</p>
+  <div class="stage"><canvas id="cv"></canvas></div>
+
+  <div class="chips" id="chips"></div>
+  <div class="sliders" id="sliders"></div>
+
+  <div class="status"><span id="stFrame"></span><span id="stKey"></span></div>
+  <div class="track" id="track"></div>
+
+  <div class="row">
+    <button class="btn" id="bPrev">◀ Frame</button>
+    <button class="btn primary" id="bPlay">▶ Play</button>
+    <button class="btn" id="bNext">Frame ▶</button>
+    <button class="btn" id="bKey">◆ Set key</button>
+    <button class="btn" id="bDel">Hapus key</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="bDemo">🚶 Contoh jalan</button>
+    <button class="btn" id="bReset">Reset</button>
+    <button class="btn on" id="bOnion">Onion skin</button>
+    <button class="btn on" id="bEase">Easing</button>
+    <button class="btn on" id="bIK">IK</button>
+    <button class="btn" id="bMesh">Lihat mesh</button>
+  </div>
+
+  <div class="help">
+    <b>Cara pakai</b>
+    <ol>
+      <li>Geser timeline ke frame tertentu.</li>
+      <li>Seret bagian tubuh di kanvas untuk memutar di sendinya (atau pilih bagian lalu pakai slider). Keyframe otomatis dibuat ◆.</li>
+      <li><b>IK aktif:</b> seret tangan/kaki (lengan bawah/betis), siku &amp; lutut menyesuaikan sendiri. Matikan IK untuk memutar per sendi.</li>
+      <li><b>Mesh:</b> badan adalah mesh bertekstur yang ditarik 2 tulang (Pinggul &amp; Dada), jadi melengkung halus. Pilih Pinggul/Dada untuk slider <i>Perut (morph)</i>. Tekan <i>Lihat mesh</i> untuk melihat jaringnya.</li>
+      <li>Pindah ke frame lain, ubah pose lagi.</li>
+      <li>Tekan Play: frame di antara keyframe dihitung otomatis.</li>
+      <li><b>Perintah:</b> ketik misalnya <i>jalan 3, lambai, duduk, diam 1, bangun, balik, lari 4</i>. Keyframe dibuat otomatis dan tetap bisa kamu edit manual sesudahnya.</li>
+    </ol>
+    Pilih <b>Kepala</b> untuk mengganti arah hadap kepala (kiri/depan/belakang/kanan), atau <b>Geser badan</b> untuk memindahkan/membalik seluruh karakter. Coba juga <b>Contoh jalan</b>.
+  </div>
+</div>
+
+<script src="js/karakter.js"></script>
+<script src="js/mesh.js"></script>
+<script src="js/ik.js"></script>
+<script src="js/render.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/perintah.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
