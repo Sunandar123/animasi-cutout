@@ -41,3 +41,9 @@ canvas{display:block;width:100%;height:auto;touch-action:none}
 .btn.sm{padding:4px 10px}
 .chk{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
 .txt{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:16px}
+.chip.add{border-style:dashed;color:var(--muted)}
+.colors{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.colors label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.colors input{width:34px;height:28px;border:1px solid var(--line);border-radius:6px;background:none;padding:0}
+select.txt{padding:6px 8px;min-width:0;width:100%}
+.sl select{grid-column:2 / 4}

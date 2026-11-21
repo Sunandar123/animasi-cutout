@@ -26,7 +26,8 @@
   <p class="sub" id="cmdMsg" style="margin:2px 0 8px">Ketik perintah, pisahkan dengan koma atau "lalu".</p>
   <div class="stage"><canvas id="cv"></canvas></div>
 
-  <div class="chips" id="chips"></div>
+  <div class="chips" id="sceneChips"></div>
+  <div class="chips" id="chips" style="padding-top:2px"></div>
   <div class="sliders" id="sliders"></div>
 
   <div class="status"><span id="stFrame"></span><span id="stKey"></span></div>
@@ -57,6 +58,8 @@
   <p class="sub" id="projMsg" style="margin:8px 2px 0"></p>
   <input type="file" id="fOpen" accept=".json,application/json" hidden>
   <input type="file" id="fBg" accept="image/*" hidden>
+  <input type="file" id="fPart" accept="image/*" hidden>
+  <input type="file" id="fObj" accept="image/*" hidden>
 
   <div class="row" style="margin-top:14px">
     <button class="btn" id="bAudio">🎵 Upload audio</button>
@@ -75,6 +78,9 @@
       <li><b>Proyek:</b> 💾 Simpan mengunduh file .json, 📂 Buka memuatnya lagi. Proyek juga tersimpan otomatis di browser.</li>
       <li><b>Background &amp; kamera:</b> 🖼 untuk upload gambar, lalu atur di chip 🖼 Background. Chip 🎥 Kamera untuk zoom/geser per keyframe, atau aktifkan 🎥 Kamera ikut supaya kamera mengikuti karakter.</li>
       <li><b>Ekspor video:</b> 🎬 memutar animasi dari awal sambil merekam, lalu mengunduh videonya (MP4 atau WebM, tergantung browser).</li>
+      <li><b>Karakter:</b> ＋ Karakter untuk menambah orang. Atur nama, warna, ukuran &amp; gemuk di 🎨 Tampilan. Perintah per karakter: <i>budi: jalan 3, ani: lambai</i> (semua mulai bersamaan, pakai <i>diam N</i> untuk menunggu).</li>
+      <li><b>Gambar sendiri:</b> pilih bagian tubuh, tekan 🖼 Pakai gambar sendiri (PNG transparan), lalu atur titik sendinya.</li>
+      <li><b>Objek:</b> ＋ Objek untuk upload gambar properti (bola, mobil, HP). Seret untuk memindah, atur rotasi/skala per keyframe, atau tempel ke tangan karakter.</li>
       <li><b>Suara &amp; mulut:</b> 🎵 upload dubbing/musik atau 🎤 rekam langsung (animasi diputar sambil merekam). Mulut bergerak otomatis mengikuti volume; isi <i>teks dialog</i> supaya bentuk A/I/U/E/O lebih pas. Mulut juga bisa diatur manual di chip Kepala, atau pakai perintah <i>bicara 2</i>. Ekspor video ikut membawa suara.</li>
       <li><b>Mesh:</b> badan adalah mesh bertekstur yang ditarik 2 tulang (Pinggul &amp; Dada), jadi melengkung halus. Pilih Pinggul/Dada untuk slider <i>Perut (morph)</i>. Tekan <i>Lihat mesh</i> untuk melihat jaringnya.</li>
       <li>Pindah ke frame lain, ubah pose lagi.</li>
@@ -90,6 +96,7 @@
 <script src="js/ik.js"></script>
 <script src="js/render.js"></script>
 <script src="js/editor.js"></script>
+<script src="js/scene.js"></script>
 <script src="js/perintah.js"></script>
 <script src="js/suara.js"></script>
 <script src="js/proyek.js"></script>

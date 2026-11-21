@@ -29,33 +29,59 @@ const WALK={0:contactA,12:passA,24:contactB,36:passB,48:contactA};
 
 const clone=o=>JSON.parse(JSON.stringify(o));
 const CAM0={x:W/2,y:H/2,z:1};
-const camOf=p=>p.cam||CAM0;
-let bg={src:null,img:null,x:W/2,y:H/2,s:1}, camFollow=false, exporting=false;
-let keys={0:clone(DEFAULT)}, frame=0, playing=false, sel='armF_l', onion=true, ease=true, ikOn=true, showMesh=false;
+
+// ---------- tampilan karakter (warna & bentuk badan) ----------
+const LOOK0={skin:'#f2c9a0',hair:'#3a2a20',shirt:'#d9622b',stripe:'#f3a46f',pants:'#44557a',shoe:'#2a2a2e',size:1,fat:1};
+const LOOK_PRESETS=[
+  {name:'Budi'},
+  {name:'Ani',skin:'#e8b48c',hair:'#1f1410',shirt:'#2b8a6e',stripe:'#7fd1b5',pants:'#7a3f6b',shoe:'#5a2a3a',size:0.95,fat:0.9},
+  {name:'Kakek',skin:'#e0b08a',hair:'#d8d8d8',shirt:'#6b5b45',stripe:'#a39274',pants:'#3a3a3a',shoe:'#1f1f1f',size:0.92,fat:1.15},
+  {name:'Anak',skin:'#f5d0ae',hair:'#4a2a18',shirt:'#e0b83a',stripe:'#fff1a8',pants:'#3f6fb5',shoe:'#c0392b',size:0.68,fat:1.05},
+  {name:'Gendut',skin:'#d9a477',hair:'#2a1a10',shirt:'#3d6fd9',stripe:'#9bb8f3',pants:'#55606e',shoe:'#2a2a2e',size:1,fat:1.6},
+  {name:'Jangkung',skin:'#c68c63',hair:'#101010',shirt:'#8a3fbf',stripe:'#c79be6',pants:'#2f4a3a',shoe:'#2a2a2e',size:1.2,fat:0.85},
+];
+function uid(p){return (p||'x')+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function newChar(name,look,x,bf){
+  const k=clone(DEFAULT);k.x=x??180;if(bf)k.bf=bf;
+  return {id:uid('c'),name:name||'Karakter',look:Object.assign({},LOOK0,look||{}),parts:{},keys:{0:k}};
+}
+
+// ---------- state adegan ----------
+let bg={src:null,img:null,x:W/2,y:H/2,s:1,screen:false}, camFollow=false, exporting=false;
+let chars=[newChar('Budi')], active=0, objs=[], selObj=-1, camKeys={0:clone(CAM0)};
+let keys=chars[0].keys, frame=0, playing=false, sel='armF_l', onion=true, ease=true, ikOn=true, showMesh=false;
+function curChar(){return chars[active];}
+function setActive(i){active=Math.max(0,Math.min(chars.length-1,i));keys=chars[active].keys;}
+function setKeys(K){keys=K;chars[active].keys=K;}
+// keyframe yang sedang diedit: kamera, objek, atau karakter aktif
+function curKeys(){return sel==='cam'?camKeys:(sel==='obj'&&objs[selObj])?objs[selObj].keys:keys;}
 
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 let dpr=Math.min(window.devicePixelRatio||1,3);
 cv.width=W*dpr;cv.height=H*dpr;
 
 function rot(x,y,a){const c=Math.cos(a),s=Math.sin(a);return [x*c-y*s,x*s+y*c];}
-function sortedKeys(){return Object.keys(keys).map(Number).sort((a,b)=>a-b);}
+function sortedKeys(K){return Object.keys(K||keys).map(Number).sort((a,b)=>a-b);}
 function lerp(a,b,t){return a+(b-a)*t;}
 
-function poseAt(f){
-  const ks=sortedKeys();
-  if(!ks.length) return clone(DEFAULT);
-  if(f<=ks[0]) return clone(keys[ks[0]]);
-  const lastK=ks[ks.length-1];
-  if(f>=lastK) return clone(keys[lastK]);
+// interpolasi umum: cari dua keyframe terdekat lalu campur
+function interpK(K,f,mix){
+  const ks=sortedKeys(K);if(!ks.length)return null;
+  if(f<=ks[0])return clone(K[ks[0]]);
+  const l=ks[ks.length-1];if(f>=l)return clone(K[l]);
   let i=0;while(ks[i+1]<=f)i++;
-  const a=ks[i],b=ks[i+1];
-  if(a===f) return clone(keys[a]);
-  let t=(f-a)/(b-a);
-  if(ease) t=t*t*(3-2*t);
-  const A=keys[a],B=keys[b],r={};
-  for(const p of PARTS) r[p.id]=lerp(A.r[p.id]||0,B.r[p.id]||0,t);
-  return {x:lerp(A.x,B.x,t),y:lerp(A.y,B.y,t),r,belly:lerp(A.belly||0,B.belly||0,t),seat:lerp(A.seat||0,B.seat||0,t),sx:(A.seat?A.sx:B.sx),mouth:A.mouth,cam:{x:lerp(camOf(A).x,camOf(B).x,t),y:lerp(camOf(A).y,camOf(B).y,t),z:lerp(camOf(A).z,camOf(B).z,t)},hv:headView(A),bf:A.bf||1};
+  const a=ks[i],b=ks[i+1];if(a===f)return clone(K[a]);
+  let t=(f-a)/(b-a);if(ease)t=t*t*(3-2*t);
+  return mix(K[a],K[b],t);
 }
+function mixPose(A,B,t){
+  const r={};for(const p of PARTS)r[p.id]=lerp(A.r[p.id]||0,B.r[p.id]||0,t);
+  return {x:lerp(A.x,B.x,t),y:lerp(A.y,B.y,t),r,belly:lerp(A.belly||0,B.belly||0,t),seat:lerp(A.seat||0,B.seat||0,t),sx:(A.seat?A.sx:B.sx),mouth:A.mouth,hv:headView(A),bf:A.bf||1};
+}
+function poseAtK(K,f){return interpK(K,f,mixPose)||clone(DEFAULT);}
+function poseAt(f){return poseAtK(keys,f);}
+function camAtF(f){return interpK(camKeys,f,(A,B,t)=>({x:lerp(A.x,B.x,t),y:lerp(A.y,B.y,t),z:lerp(A.z,B.z,t)}))||clone(CAM0);}
+function objAt(o,f){return interpK(o.keys,f,(A,B,t)=>({x:lerp(A.x,B.x,t),y:lerp(A.y,B.y,t),r:lerp(A.r||0,B.r||0,t),s:lerp(A.s??1,B.s??1,t),a:lerp(A.a??1,B.a??1,t)}))||{x:W/2,y:H/2,r:0,s:1,a:1};}
 
 function computeWorld(pose){
   const w={};

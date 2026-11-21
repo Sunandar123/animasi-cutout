@@ -9,22 +9,55 @@ function download(blob,name){
 }
 
 // ---------- simpan / buka file proyek (.json) ----------
-function projectData(withBg){
-  return {app:'animasi-cutout',v:1,frames:FRAMES,keys,camFollow,cmd:cmdIn.value,
-          bg:{x:bg.x,y:bg.y,s:bg.s,src:withBg?bg.src:null},
-          audio:audioTracks.map(trackMeta)};
+// v2: banyak karakter, objek, kamera terpisah. withImg=true menyertakan semua gambar (untuk file .json)
+function projectData(withImg){
+  return {app:'animasi-cutout',v:2,frames:FRAMES,active,camKeys,camFollow,cmd:cmdIn.value,
+    bg:{x:bg.x,y:bg.y,s:bg.s,screen:!!bg.screen,src:withImg?bg.src:null},
+    chars:chars.map(c=>({id:c.id,name:c.name,look:c.look,keys:c.keys,
+      parts:Object.fromEntries(Object.entries(c.parts).map(([pid,p])=>[pid,{px:p.px,py:p.py,s:p.s,r:p.r,mouth:p.mouth,src:withImg?p.src:null}]))})),
+    objs:objs.map(o=>({id:o.id,name:o.name,keys:o.keys,attach:o.attach,layer:o.layer,src:withImg?o.src:null})),
+    audio:audioTracks.map(trackMeta)};
 }
+function idbGet(k){try{return typeof idb!=='undefined'?idb.get(k).catch(()=>null):Promise.resolve(null);}catch(e){return Promise.resolve(null);}}
 function applyProject(d){
-  if(!d||d.app!=='animasi-cutout'||!d.keys) throw new Error('bukan file proyek animasi');
+  if(!d||d.app!=='animasi-cutout'||(!d.keys&&!d.chars)) throw new Error('bukan file proyek animasi');
   if(playing)stop();
-  keys={};Object.keys(d.keys).forEach(f=>keys[+f]=d.keys[f]);
+  const fixKeys=K=>{const o={};Object.keys(K||{}).forEach(f=>o[+f]=K[f]);return o;};
+  if(d.chars&&d.chars.length){
+    chars=d.chars.map(c=>({id:c.id,name:c.name,look:Object.assign({},LOOK0,c.look||{}),parts:{},keys:fixKeys(c.keys),_parts:c.parts||{}}));
+    camKeys=fixKeys(d.camKeys);if(!Object.keys(camKeys).length)camKeys={0:clone(CAM0)};
+  }else{                                     // proyek versi lama: 1 karakter, kamera di dalam keyframe
+    const c=newChar('Budi');c.keys=fixKeys(d.keys);camKeys={};
+    Object.entries(c.keys).forEach(([f,k])=>{if(k.cam){camKeys[f]=k.cam;delete k.cam;}});
+    if(!Object.keys(camKeys).length)camKeys={0:clone(CAM0)};
+    chars=[c];
+  }
+  setActive(Math.min(d.active||0,chars.length-1));
+  objs=(d.objs||[]).map(o=>({id:o.id,name:o.name,keys:fixKeys(o.keys),attach:o.attach||null,layer:o.layer||'front',img:null,_src:o.src}));
+  selObj=-1;if(sel==='obj')sel='root';
   FRAMES=Math.max(12,d.frames||48);frame=0;
   camFollow=!!d.camFollow;document.getElementById('bFollow').classList.toggle('on',camFollow);
   if(typeof d.cmd==='string')cmdIn.value=d.cmd;
-  const b=d.bg||{};bg.x=b.x??W/2;bg.y=b.y??H/2;bg.s=b.s??1;
+  const b=d.bg||{};bg.x=b.x??W/2;bg.y=b.y??H/2;bg.s=b.s??1;bg.screen=!!b.screen;
   if(b.src)setBgSrc(b.src,false);else{bg.src=null;bg.img=null;}
   buildChips();buildSliders();render();
+  loadSceneImages();
   loadAudioFromProject(d.audio);
+}
+// gambar bagian tubuh & objek: dari file proyek, atau dari penyimpanan browser
+async function loadSceneImages(){
+  for(const c of chars){
+    const parts=c._parts||{};delete c._parts;
+    for(const [pid,p] of Object.entries(parts)){
+      const src=p.src||await idbGet('img:'+c.id+':'+pid);if(!src)continue;
+      try{const {src:_,...cfg}=p;await setPartImage(c,pid,src,cfg);if(p.src)idbPut('img:'+c.id+':'+pid,src);}catch(e){}
+    }
+  }
+  for(const o of objs){
+    const src=o._src||await idbGet('img:'+o.id);delete o._src;if(!src)continue;
+    try{const img=await loadImg(src);o.src=src;o.img=img;o.base=100/Math.max(img.width,img.height);idbPut('img:'+o.id,src);}catch(e){}
+  }
+  buildChips();buildSliders();render();
 }
 document.getElementById('bSave').onclick=async()=>{
   const d=projectData(true);
@@ -52,15 +85,17 @@ function setBgSrc(src,fit){
   img.src=src;
 }
 function clearBg(){bg.src=null;bg.img=null;bg.x=W/2;bg.y=H/2;bg.s=1;buildSliders();render();saveBgLocal();}
-function shrinkImage(file,cb){
+// perkecil gambar supaya ringan; PNG/WebP tetap transparan
+function shrinkImage(file,cb,max){
+  max=max||1600;
   const r=new FileReader();
   r.onload=()=>{
     const im=new Image();
     im.onload=()=>{
-      const sc=Math.min(1,1600/Math.max(im.width,im.height));
+      const sc=Math.min(1,max/Math.max(im.width,im.height));
       const c=document.createElement('canvas');c.width=Math.round(im.width*sc);c.height=Math.round(im.height*sc);
       c.getContext('2d').drawImage(im,0,0,c.width,c.height);
-      cb(file.type==='image/png'?c.toDataURL('image/png'):c.toDataURL('image/jpeg',0.85));
+      cb(file.type==='image/jpeg'?c.toDataURL('image/jpeg',0.85):c.toDataURL('image/png'));
     };
     im.onerror=()=>say('Gambar tidak bisa dibaca.');
     im.src=r.result;

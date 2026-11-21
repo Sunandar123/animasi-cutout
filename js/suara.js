@@ -4,7 +4,6 @@ function ac(){if(!actx){const C=window.AudioContext||window.webkitAudioContext;a
 const audioMsg=document.getElementById('audioMsg');
 function sayA(t){audioMsg.textContent=t;}
 function fmtS(s){return s.toFixed(1).replace('.',',')+' dtk';}
-function uid(){return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 
 // ---------- penyimpanan audio di browser (IndexedDB, muat file besar) ----------
 const idb=(()=>{
@@ -15,12 +14,12 @@ const idb=(()=>{
 })();
 function blobToDataURL(b){return new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b);});}
 async function dataURLToBlob(u){return (await fetch(u)).blob();}
-function trackMeta(t){return {id:t.id,name:t.name,start:t.start,vol:t.vol,lip:t.lip,text:t.text};}
+function trackMeta(t){return {id:t.id,name:t.name,start:t.start,vol:t.vol,lip:t.lip,text:t.text,char:t.char};}
 
 // ---------- track ----------
 async function addTrackFromBlob(blob,meta){
   const buf=await ac().decodeAudioData(await blob.arrayBuffer());
-  const t=Object.assign({id:uid(),name:'Audio',start:frame/FPS,vol:1,lip:true,text:''},meta||{},{blob,buf});
+  const t=Object.assign({id:uid('t'),name:'Audio',start:frame/FPS,vol:1,lip:true,text:'',char:curChar().id},meta||{},{blob,buf});
   audioTracks.push(t);return t;
 }
 function extendToAudio(){
@@ -60,7 +59,7 @@ function audioDest(){return ac().createMediaStreamDestination();}
 // ---------- lip-sync otomatis: volume -> kapan mulut terbuka, teks -> bentuk vokal ----------
 const VOWEL={a:'A',i:'E',e:'E',u:'O',o:'O'};
 function computeLip(){
-  lipsync={};
+  lipsync={};   // per karakter: lipsync[idKarakter][frame] = bentuk mulut
   audioTracks.filter(t=>t.lip).forEach(t=>{
     const d=t.buf.getChannelData(0),sr=t.buf.sampleRate,n=Math.ceil(t.buf.duration*FPS),lv=[];
     for(let i=0;i<n;i++){
@@ -82,10 +81,11 @@ function computeLip(){
       shapes.push(m);
     }
     for(let i=1;i<n-1;i++)if(shapes[i]!==shapes[i-1]&&shapes[i]!==shapes[i+1])shapes[i]=shapes[i-1];  // buang kedip 1 frame
-    const f0=Math.round(t.start*FPS);shapes.forEach((m,i)=>{lipsync[f0+i]=m;});
+    const cid=chars.some(c=>c.id===t.char)?t.char:chars[0].id,L2=lipsync[cid]||(lipsync[cid]={});
+    const f0=Math.round(t.start*FPS);shapes.forEach((m,i)=>{L2[f0+i]=m;});
   });
 }
-function lipAt(f){return lipsync[f];}
+function lipAt(cid,f){return lipsync[cid]&&lipsync[cid][f];}
 function audioBarsHTML(){
   return audioTracks.map((t,i)=>'<div class="ab" style="left:'+(2+t.start*FPS/FRAMES*96)+'%;width:'+(t.buf.duration*FPS/FRAMES*96)+'%;top:'+(22+(i%2)*7)+'px"></div>').join('');
 }
@@ -99,6 +99,7 @@ function renderTracks(){
     el.innerHTML='<div class="trk-h"><b></b><span class="muted"></span><button class="btn sm">✕</button></div>'+
       '<label class="sl"><span>Mulai</span><input type="range" min="0" step="0.1"><span></span></label>'+
       '<label class="sl"><span>Volume</span><input type="range" min="0" max="150" step="1"><span></span></label>'+
+      '<label class="sl"><span>Mulut</span><select class="txt"></select></label>'+
       '<label class="chk"><input type="checkbox"> Gerakkan mulut (lip-sync)</label>'+
       '<input class="txt" type="text" placeholder="Teks dialog (opsional), mis: halo apa kabar">';
     el.querySelector('b').textContent=t.name;el.querySelector('.muted').textContent=fmtS(t.buf.duration);
@@ -107,6 +108,8 @@ function renderTracks(){
     rv.value=Math.round(t.vol*100);ov.textContent=rv.value+'%';
     rs.oninput=()=>{t.start=+rs.value;os.textContent=fmtS(t.start);extendToAudio();computeLip();render();};
     rv.oninput=()=>{t.vol=rv.value/100;ov.textContent=rv.value+'%';};
+    const sc=el.querySelector('select');chars.forEach(c=>sc.add(new Option(c.name,c.id)));
+    sc.value=chars.some(c=>c.id===t.char)?t.char:chars[0].id;sc.onchange=()=>{t.char=sc.value;computeLip();render();};
     const cb=el.querySelector('input[type=checkbox]');cb.checked=t.lip;cb.onchange=()=>{t.lip=cb.checked;computeLip();render();};
     const tx=el.querySelector('.txt');tx.value=t.text||'';tx.oninput=()=>{t.text=tx.value;computeLip();render();};
     el.querySelector('button').onclick=()=>{audioStop();audioTracks=audioTracks.filter(x=>x!==t);idb.del(t.id).catch(()=>{});computeLip();renderTracks();render();};

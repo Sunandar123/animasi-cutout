@@ -7,8 +7,9 @@ const RUN=[
  {y:200,r:{torso:15,head:-8,chest:2,armF_u:0,armF_l:-95,armB_u:0,armB_l:-95,legF_u:-55,legF_l:100,legB_u:10,legB_l:25}},
 ];
 function mk(x,y,r,o){const base={};PARTS.forEach(p=>base[p.id]=0);return Object.assign({x,y,r:Object.assign(base,r),belly:0,hv:'R',seat:0},o||{});}
-function buildFromCommands(text){
-  const B={t:0,keys:{},x:60,bf:1,state:'stand',log:[],unk:[]};
+function buildFromCommands(text,opt){
+  opt=opt||{};
+  const B={t:0,keys:{},x:opt.x??60,bf:opt.bf||1,state:'stand',log:[],unk:[]};
   const put=(dt,p)=>{B.t+=dt;p.bf=B.bf;B.keys[B.t]=p;};
   const last=()=>clone(B.keys[B.t]);
   const stand=o=>mk(B.x,208,clone(DEFAULT.r),o);
@@ -91,12 +92,33 @@ function buildFromCommands(text){
   return B;
 }
 const cmdIn=document.getElementById('cmdIn'),cmdMsg=document.getElementById('cmdMsg');
+// "budi: jalan 3, duduk, ani: lambai" -> perintah dikelompokkan per karakter, semua mulai bersamaan
 function runCommands(){
-  const B=buildFromCommands(cmdIn.value);
-  if(!B.log.length){cmdMsg.textContent=B.unk.length?'Perintah tidak dikenal: '+B.unk.join(', '):'Ketik perintah dulu.';return;}
+  const toks=cmdIn.value.split(/,|;|\n|\blalu\b|\bterus\b|\bkemudian\b|\bdan\b/i).map(t=>t.trim()).filter(Boolean);
+  const groups=new Map(),unkChar=[];let cur=curChar();
+  toks.forEach(tok=>{
+    const m=tok.match(/^([^:]+):\s*(.*)$/);
+    if(m){
+      const c=chars.find(c=>c.name.toLowerCase()===m[1].trim().toLowerCase());
+      if(!c){unkChar.push(m[1].trim());cur=null;return;}
+      cur=c;tok=m[2].trim();if(!tok)return;
+    }
+    if(!cur)return;
+    if(!groups.has(cur))groups.set(cur,[]);
+    groups.get(cur).push(tok);
+  });
+  if(!groups.size){cmdMsg.textContent=unkChar.length?'Karakter tidak ada: '+unkChar.join(', '):'Ketik perintah dulu.';return;}
   if(playing)stop();
-  keys=B.keys;FRAMES=Math.max(12,B.t);frame=0;sel='root';buildChips();buildSliders();
-  cmdMsg.textContent='✓ '+B.log.join(' → ')+' · '+(FRAMES/FPS).toFixed(1).replace('.',',')+' dtk'+(B.unk.length?' · tidak dikenal: '+B.unk.join(', '):'');
+  const logs=[],unk=[];let maxT=12;
+  groups.forEach((list,c)=>{
+    const p0=poseAtK(c.keys,0),B=buildFromCommands(list.join(','),{x:p0.x,bf:p0.bf||1});
+    if(B.log.length){c.keys=B.keys;maxT=Math.max(maxT,B.t);logs.push((groups.size>1||chars.length>1?c.name+': ':'')+B.log.join(' → '));}
+    unk.push(...B.unk);
+  });
+  if(!logs.length){cmdMsg.textContent='Perintah tidak dikenal: '+unk.join(', ');return;}
+  keys=chars[active].keys;FRAMES=Math.max(maxT,typeof audioTracks!=='undefined'?Math.max(0,...audioTracks.map(t=>Math.ceil((t.start+t.buf.duration)*FPS))):0);
+  frame=0;sel='root';buildChips();buildSliders();
+  cmdMsg.textContent='✓ '+logs.join(' | ')+' · '+(FRAMES/FPS).toFixed(1).replace('.',',')+' dtk'+(unk.length?' · tidak dikenal: '+unk.join(', '):'')+(unkChar.length?' · karakter tidak ada: '+unkChar.join(', '):'');
   play();
 }
 document.getElementById('cmdGo').onclick=runCommands;
