@@ -52,3 +52,8 @@ cd /www/wwwroot/animasi.kylnet.my.id && git pull
 - Buka situsnya di Chrome HP, tekan **📲 Install** (atau menu ⋮ → *Install app*).
 - Untuk file APK: masukkan URL situs di pwabuilder.com → *Package for stores* → *Android*.
   Simpan baik-baik file *signing key* yang ikut diunduh; kunci itu wajib dipakai untuk update APK berikutnya.
+
+## Versi file (anti-cache)
+
+Setiap file CSS/JS di `index.html` diberi `?v=<versi>`. Setiap rilis, nomor versi itu diganti,
+supaya browser & Cloudflare otomatis mengambil file baru, bukan file lama dari cache.
