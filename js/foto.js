@@ -23,8 +23,9 @@ async function getPoseLandmarker(){
   const mp=await import(MP_BASE+'/vision_bundle.mjs');
   const fs=await mp.FilesetResolver.forVisionTasks(MP_BASE+'/wasm');
   const opts=d=>({baseOptions:{modelAssetPath:MP_MODEL,delegate:d},runningMode:'IMAGE',numPoses:1,outputSegmentationMasks:true});
-  try{poseLM=await mp.PoseLandmarker.createFromOptions(fs,opts('GPU'));}
-  catch(e){poseLM=await mp.PoseLandmarker.createFromOptions(fs,opts('CPU'));}
+  // CPU dulu: mask background lebih andal di HP (GPU kadang memberi mask kosong)
+  try{poseLM=await mp.PoseLandmarker.createFromOptions(fs,opts('CPU'));}
+  catch(e){poseLM=await mp.PoseLandmarker.createFromOptions(fs,opts('GPU'));}
   return poseLM;
 }
 // hasil: {lm:[33 titik ternormalisasi], mask:{w,h,data}} atau null kalau tidak ada orang
@@ -64,12 +65,13 @@ function cutPerson(img,det){
   const w=img.width,h=img.height,c=canvasOf(w,h),g=c.getContext('2d');g.drawImage(img,0,0);
   let J=det?jointsFromLandmarks(det.lm,w,h):templateJoints(w,h);
   if(!det||!det.mask)return {canvas:c,joints:J,cut:false};
-  const id=g.getImageData(0,0,w,h),M=det.mask;let x0=w,y0=h,x1=0,y1=0;
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const m=M.data[Math.floor(y*M.h/h)*M.w+Math.floor(x*M.w/w)];
-    const a=Math.max(0,Math.min(1,(m-0.3)/0.35));id.data[(y*w+x)*4+3]=Math.round(a*255);
-    if(m>0.5){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
-  }
+  const M=det.mask,mAt=(x,y)=>M.data[Math.floor(y*M.h/h)*M.w+Math.floor(x*M.w/w)];
+  let x0=w,y0=h,x1=0,y1=0,n=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(mAt(x,y)>0.5){n++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+  // mask tidak masuk akal (kosong/penuh) -> pakai foto apa adanya, jangan sampai karakter jadi transparan
+  if(n<w*h*0.01||n>w*h*0.97)return {canvas:c,joints:J,cut:false,maskBad:true};
+  const id=g.getImageData(0,0,w,h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const a=Math.max(0,Math.min(1,(mAt(x,y)-0.3)/0.35));id.data[(y*w+x)*4+3]=Math.round(a*255);}
   g.putImageData(id,0,0);
   if(x1<=x0||y1<=y0)return {canvas:c,joints:J,cut:true};
   const pad=Math.round(Math.max(x1-x0,y1-y0)*0.04);
@@ -92,7 +94,10 @@ function bindPhoto(ch){
   const bones={};
   PH_ORDER.forEach(id=>{const [a,b]=PH_BONES[id],o=J[a],e=J[b];bones[id]={o,e,th:Math.atan2(-(e[0]-o[0]),e[1]-o[1]),len:Math.hypot(e[0]-o[0],e[1]-o[1])||1};});
   const legLen=(bones.legF_u.len+bones.legF_l.len+bones.legB_u.len+bones.legB_l.len)/2;
-  const gs=92/Math.max(1,legLen);     // skala: panjang kaki foto = panjang kaki kerangka
+  let gs=92/Math.max(1,legLen);       // skala: panjang kaki foto = panjang kaki kerangka
+  // batasi tinggi badan supaya tidak raksasa/kerdil kalau kaki terpotong atau titiknya meleset
+  const bodyH=Math.max(1,Math.max(J.ankleF[1],J.ankleB[1])-J.headTop[1]);
+  gs=Math.max(140/bodyH,Math.min(260/bodyH,gs));
   // mesh dipisah per kelompok (badan, tiap lengan, tiap kaki) supaya kaki/lengan tidak saling menempel
   const cell=Math.max(5,Math.round(Math.max(w,h)/48)),cols=Math.ceil(w/cell),rows=Math.ceil(h/cell);
   const vid={},verts=[],tris=[];
@@ -107,6 +112,14 @@ function bindPhoto(ch){
     const dom=PH_ORDER.map(id=>[id,distSeg(cx,cy,bones[id].o[0],bones[id].o[1],bones[id].e[0],bones[id].e[1])]).sort((p,q)=>p[1]-q[1])[0][0];
     const grp=PH_GROUP[dom],a=V(i,j,grp),b=V(i+1,j,grp),c=V(i+1,j+1,grp),d=V(i,j+1,grp);
     tris.push({t:[a,b,c],l:PH_LAYER[dom]},{t:[a,c,d],l:PH_LAYER[dom]});
+  }
+  if(!tris.length){       // gambar transparan semua -> pakai seluruh kotak gambar
+    for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
+      const cx=(i+.5)*cell,cy=(j+.5)*cell;
+      const dom=PH_ORDER.map(id=>[id,distSeg(cx,cy,bones[id].o[0],bones[id].o[1],bones[id].e[0],bones[id].e[1])]).sort((p,q)=>p[1]-q[1])[0][0];
+      const grp=PH_GROUP[dom],a=V(i,j,grp),b=V(i+1,j,grp),c=V(i+1,j+1,grp),d=V(i,j+1,grp);
+      tris.push({t:[a,b,c],l:PH_LAYER[dom]},{t:[a,c,d],l:PH_LAYER[dom]});
+    }
   }
   tris.sort((p,q)=>p.l-q.l);
   ph.bind={tex,bones,g:gs,verts,tris:tris.map(t=>t.t),mouth:ph.joints.mouth};
@@ -155,41 +168,45 @@ function drawPhotoChar(pose,ch,alpha,ghost){
 
 // ---------- alur: pilih foto -> AI -> rig -> atur titik ----------
 let photoEdit=false;
-async function setPhoto(ch,src,joints,mouthOn){
+async function setPhoto(ch,src,joints,mouthOn,extra){
   const img=await loadImg(src);
-  ch.photo={src,img,joints,mouth:mouthOn!==false};bindPhoto(ch);
+  ch.photo=Object.assign({src,img,joints,mouth:mouthOn!==false},extra||{});bindPhoto(ch);
+}
+// proses foto asli: AI -> (hapus background) -> rig. orig disimpan supaya bisa diproses ulang
+async function processPhoto(ch,orig,removeBg){
+  const img=await loadImg(orig);let det=null,aiOk=true;
+  say('🤖 Memuat AI & mendeteksi pose… (pertama kali agak lama)');
+  try{det=await detectPose(img);}catch(e){aiOk=false;}
+  let r=cutPerson(img,removeBg?det:(det&&{lm:det.lm,mask:null}));
+  if(det&&r.joints._facingLeft){         // foto menghadap kiri -> dibalik supaya menghadap kanan
+    const fc=flipCanvas(r.canvas),W2=fc.width;Object.keys(r.joints).forEach(k=>{if(Array.isArray(r.joints[k]))r.joints[k]=[W2-r.joints[k][0],r.joints[k][1]];});
+    r=Object.assign({},r,{canvas:fc});
+  }
+  delete r.joints._facingLeft;
+  const out=r.canvas.toDataURL('image/png');
+  await setPhoto(ch,out,r.joints,ch.photo?ch.photo.mouth:true,{orig,nobg:!removeBg});
+  idbPut('img:'+ch.id+':photo',out);idbPut('img:'+ch.id+':photoOrig',orig);
+  photoEdit=true;sel='look';buildChips();buildSliders();render();
+  say(!aiOk?'AI tidak bisa dimuat (cek internet). Atur titik sendi secara manual, background tidak dihapus.'
+    :!det?'Orang tidak terdeteksi. Atur titik sendi secara manual.'
+    :r.maskBad?'⚠ Background tidak bisa dihapus otomatis untuk foto ini, foto dipakai apa adanya. Rapikan titik sendi, lalu ✓ Selesai.'
+    :'✓ Foto jadi karakter'+(r.cut?' (background dihapus)':'')+'. Rapikan titik yang meleset, lalu tekan ✓ Selesai.');
 }
 const fPhoto=document.getElementById('fPhoto');
 fPhoto.onchange=()=>{
   const f=fPhoto.files[0];fPhoto.value='';if(!f)return;
   const ch=curChar();
   shrinkImage(f,async src=>{
-    try{
-      const img=await loadImg(src);let det=null,aiOk=true;
-      say('🤖 Memuat AI & mendeteksi pose… (pertama kali agak lama)');
-      try{det=await detectPose(img);}catch(e){aiOk=false;}
-      let r=cutPerson(img,det);
-      if(det&&r.joints._facingLeft){         // foto menghadap kiri -> dibalik supaya menghadap kanan
-        const fc=flipCanvas(r.canvas),W2=fc.width;Object.keys(r.joints).forEach(k=>{if(Array.isArray(r.joints[k]))r.joints[k]=[W2-r.joints[k][0],r.joints[k][1]];});
-        r={canvas:fc,joints:r.joints,cut:r.cut};
-      }
-      delete r.joints._facingLeft;
-      const out=r.canvas.toDataURL('image/png');
-      await setPhoto(ch,out,r.joints);idbPut('img:'+ch.id+':photo',out);
-      photoEdit=true;sel='look';buildChips();buildSliders();render();
-      say(!aiOk?'AI tidak bisa dimuat (cek internet). Atur titik sendi secara manual, background tidak dihapus.'
-        :!det?'Orang tidak terdeteksi. Atur titik sendi secara manual.'
-        :'✓ Foto jadi karakter'+(r.cut?' (background dihapus)':'')+'. Rapikan titik yang meleset, lalu tekan ✓ Selesai.');
-    }catch(e){say('Foto gagal diproses.');}
+    try{await processPhoto(ch,src,true);}catch(e){say('Foto gagal diproses.');}
   },1024);
 };
 function flipPhoto(ch){
   const ph=ch.photo,fc=flipCanvas(ph.img),W2=fc.width,J={};
   Object.entries(ph.joints).forEach(([k,v])=>J[k]=[W2-v[0],v[1]]);
   const out=fc.toDataURL('image/png');
-  setPhoto(ch,out,J,ph.mouth).then(()=>{idbPut('img:'+ch.id+':photo',out);buildSliders();render();});
+  setPhoto(ch,out,J,ph.mouth,{orig:ph.orig,nobg:ph.nobg}).then(()=>{idbPut('img:'+ch.id+':photo',out);buildSliders();render();});
 }
-function removePhoto(ch){delete ch.photo;photoEdit=false;idbDel('img:'+ch.id+':photo');buildSliders();render();}
+function removePhoto(ch){delete ch.photo;photoEdit=false;idbDel('img:'+ch.id+':photo');idbDel('img:'+ch.id+':photoOrig');buildSliders();render();}
 
 // panel di 🎨 Tampilan
 function buildPhotoPanel(ch){
@@ -208,6 +225,13 @@ function buildPhotoPanel(ch){
   lb.innerHTML='<input type="checkbox"> Tampilkan mulut lip-sync di wajah foto';
   const cb=lb.querySelector('input');cb.checked=ch.photo.mouth!==false;cb.onchange=()=>{ch.photo.mouth=cb.checked;render();};
   slEl.appendChild(lb);
+  if(ch.photo.orig){
+    const lb2=document.createElement('label');lb2.className='chk';
+    lb2.innerHTML='<input type="checkbox"> Hapus background foto (diproses ulang, titik sendi dideteksi lagi)';
+    const cb2=lb2.querySelector('input');cb2.checked=!ch.photo.nobg;
+    cb2.onchange=()=>processPhoto(ch,ch.photo.orig,cb2.checked).catch(()=>say('Foto gagal diproses.'));
+    slEl.appendChild(lb2);
+  }
 }
 // editor titik sendi: seret titik di atas foto
 function buildRigEditor(ch){

@@ -15,7 +15,7 @@ function projectData(withImg){
     bg:{x:bg.x,y:bg.y,s:bg.s,screen:!!bg.screen,src:withImg?bg.src:null},
     chars:chars.map(c=>({id:c.id,name:c.name,look:c.look,keys:c.keys,
       parts:Object.fromEntries(Object.entries(c.parts).map(([pid,p])=>[pid,{px:p.px,py:p.py,s:p.s,r:p.r,mouth:p.mouth,src:withImg?p.src:null}])),
-      photo:c.photo?{joints:c.photo.joints,mouth:c.photo.mouth,src:withImg?c.photo.src:null}:null})),
+      photo:c.photo?{joints:c.photo.joints,mouth:c.photo.mouth,nobg:!!c.photo.nobg,src:withImg?c.photo.src:null,orig:withImg?(c.photo.orig||null):null}:null})),
     objs:objs.map(o=>({id:o.id,name:o.name,keys:o.keys,attach:o.attach,layer:o.layer,src:withImg?o.src:null})),
     audio:audioTracks.map(trackMeta)};
 }
@@ -57,7 +57,8 @@ async function loadSceneImages(){
   for(const c of chars){
     const p=c._photo;delete c._photo;if(!p)continue;
     const src=p.src||await idbGet('img:'+c.id+':photo');if(!src)continue;
-    try{await setPhoto(c,src,p.joints,p.mouth);if(p.src)idbPut('img:'+c.id+':photo',src);}catch(e){}
+    const orig=p.orig||await idbGet('img:'+c.id+':photoOrig');
+    try{await setPhoto(c,src,p.joints,p.mouth,{orig:orig||null,nobg:!!p.nobg});if(p.src)idbPut('img:'+c.id+':photo',src);if(p.orig)idbPut('img:'+c.id+':photoOrig',p.orig);}catch(e){}
   }
   for(const o of objs){
     const src=o._src||await idbGet('img:'+o.id);delete o._src;if(!src)continue;

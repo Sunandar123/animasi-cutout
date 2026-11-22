@@ -18,7 +18,7 @@ function dupChar(){
   const ch=curChar(),c=newChar(uniqueName(ch.name),clone(ch.look));
   c.keys=clone(ch.keys);Object.values(c.keys).forEach(k=>{k.x+=60;if(k.sx!==undefined)k.sx+=60;});
   Object.entries(ch.parts).forEach(([pid,cfg])=>{const {img,...rest}=cfg;c.parts[pid]=Object.assign(clone(rest),{img});idbPut('img:'+c.id+':'+pid,cfg.src);});
-  if(ch.photo){c.photo={src:ch.photo.src,img:ch.photo.img,joints:clone(ch.photo.joints),mouth:ch.photo.mouth};bindPhoto(c);idbPut('img:'+c.id+':photo',ch.photo.src);}
+  if(ch.photo){c.photo={src:ch.photo.src,img:ch.photo.img,joints:clone(ch.photo.joints),mouth:ch.photo.mouth,orig:ch.photo.orig,nobg:ch.photo.nobg};if(ch.photo.orig)idbPut('img:'+c.id+':photoOrig',ch.photo.orig);bindPhoto(c);idbPut('img:'+c.id+':photo',ch.photo.src);}
   chars.push(c);setActive(chars.length-1);sel='look';buildChips();buildSliders();render();
 }
 function delChar(){
