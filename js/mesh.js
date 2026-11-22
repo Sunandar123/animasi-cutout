@@ -32,10 +32,10 @@ function meshVerts(pose,w,fat){
 }
 function meshTris(){const T=[],n=MC.length;for(let r=0;r<MR-1;r++)for(let c=0;c<n-1;c++){const i=r*n+c;T.push([i,i+1,i+n+1],[i,i+n+1,i+n]);}return T;}
 const TRIS=meshTris();
-function drawTexTri(p0,p1,p2,tex){
+function drawTexTri(p0,p1,p2,tex,ex){
   const cx=(p0.x+p1.x+p2.x)/3,cy=(p0.y+p1.y+p2.y)/3;
   ctx.save();ctx.beginPath();
-  [p0,p1,p2].forEach((p,i)=>{const dx=p.x-cx,dy=p.y-cy,l=Math.hypot(dx,dy)||1,e=0.8;const X=p.x+dx/l*e,Y=p.y+dy/l*e;i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});
+  [p0,p1,p2].forEach((p,i)=>{const dx=p.x-cx,dy=p.y-cy,l=Math.hypot(dx,dy)||1,e=ex||0.8;const X=p.x+dx/l*e,Y=p.y+dy/l*e;i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});
   ctx.closePath();ctx.clip();
   const du1=p1.u-p0.u,dv1=p1.v-p0.v,du2=p2.u-p0.u,dv2=p2.v-p0.v;
   const dx1=p1.x-p0.x,dy1=p1.y-p0.y,dx2=p2.x-p0.x,dy2=p2.y-p0.y;

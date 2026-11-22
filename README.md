@@ -14,6 +14,7 @@ js/mesh.js        mesh badan bertekstur (skinning + morph perut)
 js/ik.js          inverse kinematics tangan & kaki
 js/render.js      menggambar karakter, kursi, onion skin, hit test
 js/scene.js       karakter (tambah, tampilan, gambar sendiri) & objek
+js/foto.js        karakter dari foto: AI MediaPipe (hapus background + deteksi sendi), mesh rig
 js/editor.js      interaksi: seret, slider, timeline, tombol
 js/perintah.js    perintah teks -> klip gerakan otomatis
 js/suara.js       audio, rekam mikrofon, lip-sync otomatis

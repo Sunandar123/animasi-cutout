@@ -40,10 +40,10 @@ cv.addEventListener('pointerdown',e=>{
   const order=[active,...chars.map((_,i)=>i).reverse().filter(i=>i!==active)];
   for(const ci of order){
     const ch=chars[ci],pose=poseAtK(ch.keys,frame),[cx,cy]=ptChar(ch,pose,wx,wy);
-    const hit=hitTest(computeWorld(pose),cx,cy,ch);
+    const hit=hitTest(charWorld(ch,pose),cx,cy,ch);
     if(!hit)continue;
     if(ci!==active||hit!==sel){setActive(ci);sel=hit;buildChips();buildSliders();}
-    const k=ensureKey(),w=computeWorld(k),j=w[sel];
+    const k=ensureKey(),w=charWorld(ch,k),j=w[sel];
     cv.setPointerCapture(e.pointerId);
     if(ikOn&&IK[sel])drag={ik:true,ox:j.ex-cx,oy:j.ey-cy};
     else drag={j,start:Math.atan2(cy-j.y,cx-j.x),deg:k.r[sel]||0};
@@ -72,7 +72,7 @@ cv.addEventListener('pointermove',e=>{
   }
   const [wx,wy]=pt(e),[cx,cy]=ptChar(curChar(),k,wx,wy);
   if(drag.ik){
-    solveIK(k,sel,cx+drag.ox,cy+drag.oy);
+    solveIK(k,sel,cx+drag.ox,cy+drag.oy,kk=>charWorld(curChar(),kk));
   }else{
     let d=(Math.atan2(cy-drag.j.y,cx-drag.j.x)-drag.start)*R2D;
     d=((d%360)+540)%360-180;

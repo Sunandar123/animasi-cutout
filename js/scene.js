@@ -18,12 +18,13 @@ function dupChar(){
   const ch=curChar(),c=newChar(uniqueName(ch.name),clone(ch.look));
   c.keys=clone(ch.keys);Object.values(c.keys).forEach(k=>{k.x+=60;if(k.sx!==undefined)k.sx+=60;});
   Object.entries(ch.parts).forEach(([pid,cfg])=>{const {img,...rest}=cfg;c.parts[pid]=Object.assign(clone(rest),{img});idbPut('img:'+c.id+':'+pid,cfg.src);});
+  if(ch.photo){c.photo={src:ch.photo.src,img:ch.photo.img,joints:clone(ch.photo.joints),mouth:ch.photo.mouth};bindPhoto(c);idbPut('img:'+c.id+':photo',ch.photo.src);}
   chars.push(c);setActive(chars.length-1);sel='look';buildChips();buildSliders();render();
 }
 function delChar(){
   if(chars.length<=1)return;
   const ch=curChar();
-  Object.keys(ch.parts).forEach(pid=>idbDel('img:'+ch.id+':'+pid));
+  Object.keys(ch.parts).forEach(pid=>idbDel('img:'+ch.id+':'+pid));idbDel('img:'+ch.id+':photo');
   objs.forEach(o=>{if(o.attach&&o.attach.char===ch.id)o.attach=null;});
   chars.splice(active,1);setActive(Math.min(active,chars.length-1));
   if(typeof audioTracks!=='undefined')audioTracks.forEach(t=>{if(t.char===ch.id)t.char=chars[0].id;});
@@ -38,6 +39,15 @@ function buildLookPanel(ch){
   const nm=document.createElement('input');nm.className='txt';nm.value=ch.name;nm.placeholder='Nama karakter';
   nm.oninput=()=>{const v=cleanName(nm.value);if(v){ch.name=v;buildChips();}};
   slEl.appendChild(nm);
+  buildPhotoPanel(ch);
+  if(photoEdit&&ch.photo)return;
+  if(ch.photo){
+    addSliders([{global:true,label:'Ukuran',min:50,max:150,unit:'%',get:()=>(ch.look.size||1)*100,set:(k,v)=>ch.look.size=v/100}]);
+    const r=addRow();
+    addBtn(r,'⬅ Ke belakang',()=>moveChar(-1));addBtn(r,'Ke depan ➡',()=>moveChar(1));addBtn(r,'Duplikat',()=>dupChar());
+    if(chars.length>1)addBtn(r,'Hapus karakter',()=>delChar());
+    return;
+  }
   const pr=addRow();
   LOOK_PRESETS.forEach(p=>addBtn(pr,p.name,()=>{const {name,...lk}=p;ch.look=Object.assign({},LOOK0,lk);buildSliders();render();}));
   const grid=document.createElement('div');grid.className='colors';

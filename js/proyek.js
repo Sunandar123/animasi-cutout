@@ -14,7 +14,8 @@ function projectData(withImg){
   return {app:'animasi-cutout',v:2,frames:FRAMES,active,camKeys,camFollow,cmd:cmdIn.value,
     bg:{x:bg.x,y:bg.y,s:bg.s,screen:!!bg.screen,src:withImg?bg.src:null},
     chars:chars.map(c=>({id:c.id,name:c.name,look:c.look,keys:c.keys,
-      parts:Object.fromEntries(Object.entries(c.parts).map(([pid,p])=>[pid,{px:p.px,py:p.py,s:p.s,r:p.r,mouth:p.mouth,src:withImg?p.src:null}]))})),
+      parts:Object.fromEntries(Object.entries(c.parts).map(([pid,p])=>[pid,{px:p.px,py:p.py,s:p.s,r:p.r,mouth:p.mouth,src:withImg?p.src:null}])),
+      photo:c.photo?{joints:c.photo.joints,mouth:c.photo.mouth,src:withImg?c.photo.src:null}:null})),
     objs:objs.map(o=>({id:o.id,name:o.name,keys:o.keys,attach:o.attach,layer:o.layer,src:withImg?o.src:null})),
     audio:audioTracks.map(trackMeta)};
 }
@@ -24,7 +25,7 @@ function applyProject(d){
   if(playing)stop();
   const fixKeys=K=>{const o={};Object.keys(K||{}).forEach(f=>o[+f]=K[f]);return o;};
   if(d.chars&&d.chars.length){
-    chars=d.chars.map(c=>({id:c.id,name:c.name,look:Object.assign({},LOOK0,c.look||{}),parts:{},keys:fixKeys(c.keys),_parts:c.parts||{}}));
+    chars=d.chars.map(c=>({id:c.id,name:c.name,look:Object.assign({},LOOK0,c.look||{}),parts:{},keys:fixKeys(c.keys),_parts:c.parts||{},_photo:c.photo||null}));
     camKeys=fixKeys(d.camKeys);if(!Object.keys(camKeys).length)camKeys={0:clone(CAM0)};
   }else{                                     // proyek versi lama: 1 karakter, kamera di dalam keyframe
     const c=newChar('Budi');c.keys=fixKeys(d.keys);camKeys={};
@@ -52,6 +53,11 @@ async function loadSceneImages(){
       const src=p.src||await idbGet('img:'+c.id+':'+pid);if(!src)continue;
       try{const {src:_,...cfg}=p;await setPartImage(c,pid,src,cfg);if(p.src)idbPut('img:'+c.id+':'+pid,src);}catch(e){}
     }
+  }
+  for(const c of chars){
+    const p=c._photo;delete c._photo;if(!p)continue;
+    const src=p.src||await idbGet('img:'+c.id+':photo');if(!src)continue;
+    try{await setPhoto(c,src,p.joints,p.mouth);if(p.src)idbPut('img:'+c.id+':photo',src);}catch(e){}
   }
   for(const o of objs){
     const src=o._src||await idbGet('img:'+o.id);delete o._src;if(!src)continue;

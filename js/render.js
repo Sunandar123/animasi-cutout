@@ -34,6 +34,7 @@ function drawMouth(j,lx,ly,sx,ms){
 
 function drawPose(pose,alpha,ghost,ch){
   ch=ch||curChar();
+  if(ch.photo&&ch.photo.bind)return drawPhotoChar(pose,ch,alpha,ghost);
   const w=computeWorld(pose),L=ch.look,th=thick(ch),pi=ch.parts||{};
   const hv=headView(pose),hf=hv==='L'?-1:1,ms=pose.mouth||'X';
   const has=id=>!ghost&&pi[id]&&pi[id].img;
@@ -117,7 +118,7 @@ function drawObj(o,st){
 }
 function attachPoint(w,part){
   const j=w[part];
-  if(part==='head'){const c=rot(0,24,j.a);return {x:j.x+c[0],y:j.y+c[1],a:j.a+Math.PI};}
+  if(part==='head'){if(j.cx!==undefined)return {x:j.cx,y:j.cy,a:j.a+Math.PI};const c=rot(0,24,j.a);return {x:j.x+c[0],y:j.y+c[1],a:j.a+Math.PI};}
   if(part==='chest')return {x:(j.x+j.ex)/2,y:(j.y+j.ey)/2,a:j.a+Math.PI};
   return {x:j.ex,y:j.ey,a:j.a};
 }
@@ -194,7 +195,7 @@ function drawSelection(pose,w){
   }else if(w[sel]){
     const j=w[sel];
     ctx.setLineDash([4,3]);ctx.beginPath();
-    if(sel==='head'){const c=rot(0,24,j.a);ctx.arc(j.x+c[0],j.y+c[1],25,0,Math.PI*2);}
+    if(sel==='head'){if(j.cx!==undefined)ctx.arc(j.cx,j.cy,j.rad+3,0,Math.PI*2);else{const c=rot(0,24,j.a);ctx.arc(j.x+c[0],j.y+c[1],25,0,Math.PI*2);}}
     else{ctx.moveTo(j.x,j.y);ctx.lineTo(j.ex,j.ey);}
     ctx.stroke();ctx.setLineDash([]);
     ctx.beginPath();ctx.arc(j.x,j.y,5,0,Math.PI*2);ctx.fill();
@@ -214,7 +215,7 @@ function hitTest(w,px,py,ch){
   const th=ch?thick(ch):1;let best=null,bd=12;
   for(const id of HIT_ORDER){
     const p=P[id],j=w[id];let d;
-    if(id==='head'){const c=rot(0,24,j.a);d=Math.hypot(px-j.x-c[0],py-j.y-c[1])-22;}
+    if(id==='head'){if(j.cx!==undefined)d=Math.hypot(px-j.cx,py-j.cy)-j.rad;else{const c=rot(0,24,j.a);d=Math.hypot(px-j.x-c[0],py-j.y-c[1])-22;}}
     else d=distSeg(px,py,j.x,j.y,j.ex,j.ey)-p.w*th/2;
     if(d<bd){bd=d;best=id;}
   }
